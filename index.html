@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drysdale — Sales Ops</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@400;600;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0b0d; --bg2: #111318; --bg3: #181c23; --bg4: #1e232c;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0; --muted: #6b7280; --muted2: #9aa0ab;
+    --accent: #3b82f6; --accent2: #60a5fa;
+    --green: #22c55e; --green2: #4ade80;
+    --red: #ef4444; --red2: #f87171;
+    --amber: #f59e0b; --amber2: #fbbf24;
+    --purple: #a855f7; --purple2: #c084fc;
+    --teal: #14b8a6; --teal2: #2dd4bf;
+    --font: 'Syne', sans-serif; --mono: 'DM Mono', monospace;
+    --r: 10px; --rl: 14px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar { width: 210px; min-width: 210px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; overflow-y: auto; }
+  .logo { padding: 0 18px 20px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+  .logo .name { font-size: 15px; font-weight: 800; letter-spacing: 0.02em; }
+  .logo .sub { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 2px; letter-spacing: 0.06em; }
+  .logo .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .nsec { padding: 6px 14px 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+  .ni { display: flex; align-items: center; gap: 9px; padding: 8px 18px; font-size: 13px; color: var(--muted2); cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: all 0.12s; font-family: var(--font); }
+  .ni:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .ni.active { color: var(--accent2); background: rgba(59,130,246,0.1); border-left: 2px solid var(--accent); }
+  .ni i { font-size: 15px; }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { padding: 14px 26px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .topbar-l .title { font-size: 17px; font-weight: 700; }
+  .topbar-l .sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .ptabs { display: flex; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 3px; gap: 2px; }
+  .ptab { padding: 5px 14px; font-size: 12px; font-weight: 600; border-radius: 7px; cursor: pointer; color: var(--muted); border: none; background: none; transition: all 0.12s; font-family: var(--font); }
+  .ptab.active { background: var(--accent); color: #fff; }
+  .content { flex: 1; overflow-y: auto; padding: 22px 26px; }
+
+  /* LOADING */
+  .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; }
+  .spinner { width: 36px; height: 36px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+
+  /* ERROR */
+  .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--r); padding: 20px; font-size: 13px; color: var(--red2); line-height: 1.6; }
+  .error-box strong { display: block; margin-bottom: 8px; font-size: 14px; }
+
+  /* CARDS */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--rl); padding: 18px; }
+  .ctitle { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
+
+  /* METRICS */
+  .mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .mt { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 13px 15px; }
+  .mt .lbl { font-size: 10px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.03em; margin-bottom: 5px; }
+  .mt .val { font-size: 21px; font-weight: 700; line-height: 1.2; }
+  .mt .dlt { font-size: 11px; margin-top: 3px; font-family: var(--mono); color: var(--muted2); }
+  .mt.acc { border-color: rgba(59,130,246,0.3); background: rgba(59,130,246,0.07); }
+  .mt.grn { border-color: rgba(34,197,94,0.25); background: rgba(34,197,94,0.06); }
+  .mt.red { border-color: rgba(239,68,68,0.25); background: rgba(239,68,68,0.06); }
+  .mt.amb { border-color: rgba(245,158,11,0.25); background: rgba(245,158,11,0.06); }
+  .mt.pur { border-color: rgba(168,85,247,0.25); background: rgba(168,85,247,0.06); }
+
+  /* BADGE */
+  .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 600; font-family: var(--mono); }
+  .badge.g { background: rgba(34,197,94,0.15); color: var(--green2); }
+  .badge.r { background: rgba(239,68,68,0.15); color: var(--red2); }
+  .badge.a { background: rgba(245,158,11,0.15); color: var(--amber2); }
+  .badge.b { background: rgba(59,130,246,0.15); color: var(--accent2); }
+
+  /* TABLE */
+  .dt { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .dt th { text-align: left; padding: 7px 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); font-family: var(--mono); }
+  .dt td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 12px; }
+  .dt tr:last-child td { border-bottom: none; }
+  .dt tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .mb14 { margin-bottom: 14px; }
+  .mb18 { margin-bottom: 18px; }
+
+  /* FUNNEL */
+  .funnel { display: flex; align-items: flex-end; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+  .fstage { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; }
+  .fbar { width: 68%; border-radius: 5px 5px 0 0; transition: all 0.3s; }
+  .flab { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-top: 8px; text-align: center; }
+  .fval { font-size: 16px; font-weight: 700; text-align: center; margin-top: 2px; }
+  .fcvr { font-size: 10px; font-family: var(--mono); color: var(--muted2); text-align: center; }
+  .farr { display: flex; align-items: center; color: var(--muted); font-size: 12px; padding-bottom: 55px; padding: 0 1px 55px; }
+
+  /* INSIGHT */
+  .insight { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .insight:last-child { border-bottom: none; }
+  .iico { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .iico.w { background: rgba(245,158,11,0.15); color: var(--amber2); }
+  .iico.d { background: rgba(239,68,68,0.15); color: var(--red2); }
+  .iico.o { background: rgba(34,197,94,0.15); color: var(--green2); }
+  .iico.i { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .itxt .tt { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .itxt .bd { font-size: 12px; color: var(--muted2); line-height: 1.5; }
+
+  /* PROG */
+  .prog-wrap { background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .prog-bar { height: 4px; border-radius: 3px; }
+
+  /* chart wrap */
+  .cw { position: relative; width: 100%; }
+
+  /* page */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  .mono { font-family: var(--mono); }
+  .sep { height: 1px; background: var(--border); margin: 16px 0; }
+  .alert { padding: 10px 12px; border-radius: 8px; font-size: 12px; color: var(--muted2); margin-top: 12px; }
+  .alert.red { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); }
+  .alert.amb { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }
+  .alert.grn { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); }
+  .alert strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="sidebar">
+  <div class="logo">
+    <div class="name"><span class="dot"></span>Drysdale</div>
+    <div class="sub">LIVE · SALES OPS</div>
+  </div>
+  <div class="nsec">Overview</div>
+  <button class="ni active" onclick="nav(this,'overview')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
+  <button class="ni" onclick="nav(this,'funnel')"><i class="ti ti-filter"></i> Funnel</button>
+  <button class="ni" onclick="nav(this,'insights')"><i class="ti ti-bulb"></i> Insights</button>
+  <div class="nsec">Performance</div>
+  <button class="ni" onclick="nav(this,'trends')"><i class="ti ti-chart-line"></i> Daily Trends</button>
+  <button class="ni" onclick="nav(this,'revenue')"><i class="ti ti-currency-dollar"></i> Revenue</button>
+  <div class="nsec">Top of Funnel</div>
+  <button class="ni" onclick="nav(this,'traffic')"><i class="ti ti-world"></i> Traffic & VSL</button>
+  <button class="ni" onclick="nav(this,'booking')"><i class="ti ti-calendar"></i> Booking</button>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-l">
+      <div class="title" id="ptitle">Dashboard</div>
+      <div class="sub" id="psub">Loading live data…</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="ptabs">
+        <button class="ptab active" onclick="setPeriod(this,7)">7D</button>
+        <button class="ptab" onclick="setPeriod(this,14)">14D</button>
+        <button class="ptab" onclick="setPeriod(this,30)">30D</button>
+        <button class="ptab" onclick="setPeriod(this,0)">All</button>
+      </div>
+      <button onclick="loadData()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--muted2);padding:6px 12px;border-radius:var(--r);cursor:pointer;font-size:12px;font-family:var(--font);">
+        <i class="ti ti-refresh"></i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="loading-screen">
+      <div class="spinner"></div>
+      <div class="loading-text">Fetching live data from Google Sheets…</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const RAW_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQezmtjdhbft-6VYg-Q4Wxz29wuu-iRSFVHUUNQIf8HdpRbLVIKhi6dyaqsNiD_pnS32U6hFcGx66t0/pub?gid=1618377966&single=true&output=csv';
+const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent(RAW_URL);
+
+let allRows = [];
+let activePeriod = 7;
+let activePage = 'overview';
+let charts = {};
+
+const pageMeta = {
+  overview: ['Dashboard', 'Live KPIs — Drysdale'],
+  funnel:   ['Funnel Analysis', 'Stage-by-stage conversion'],
+  insights: ['Insights', 'Automated bottleneck detection'],
+  trends:   ['Daily Trends', 'Show rate, close rate, and volume over time'],
+  revenue:  ['Revenue', 'Cash collected, contract value, COPC'],
+  traffic:  ['Traffic & VSL', 'LP visits, VSL plays, watch time, TF submits'],
+  booking:  ['Booking', 'Calls booked, book rate, speed to lead'],
+};
+
+function nav(btn, page) {
+  document.querySelectorAll('.ni').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activePage = page;
+  const [t, s] = pageMeta[page] || ['Dashboard',''];
+  document.getElementById('ptitle').textContent = t;
+  document.getElementById('psub').textContent = s + ' · ' + periodLabel();
+  renderPage();
+}
+
+function setPeriod(btn, n) {
+  document.querySelectorAll('.ptab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activePeriod = n;
+  document.getElementById('psub').textContent = (pageMeta[activePage]||['',''])[1] + ' · ' + periodLabel();
+  renderPage();
+}
+
+function periodLabel() {
+  if (activePeriod === 0) return 'All time';
+  return 'Last ' + activePeriod + ' days';
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',').map(v => v.replace(/"/g,'').trim());
+    const obj = {};
+    headers.forEach((h, idx) => obj[h] = vals[idx] || '');
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function toNum(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  return parseFloat(String(v).replace(/[$,%]/g,'')) || 0;
+}
+
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+async function loadData() {
+  document.getElementById('content').innerHTML = `
+    <div class="loading-screen">
+      <div class="spinner"></div>
+      <div class="loading-text">Fetching live data…</div>
+    </div>`;
+  charts = {};
+  try {
+    const res = await fetch(SHEET_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const raw = parseCSV(text);
+    // Filter rows that have a valid date and skip header-like rows
+    allRows = raw.filter(r => {
+      const d = parseDate(r['Date'] || r[Object.keys(r)[0]]);
+      return d !== null;
+    });
+    document.getElementById('psub').textContent = (pageMeta[activePage]||['',''])[1] + ' · ' + periodLabel();
+    renderPage();
+  } catch(e) {
+    document.getElementById('content').innerHTML = `
+      <div class="error-box">
+        <strong>Could not load data</strong>
+        Make sure the sheet is published: File → Share → Publish to web → Drysdale tab → CSV.<br><br>
+        Error: ${e.message}
+      </div>`;
+  }
+}
+
+function getRows() {
+  if (activePeriod === 0) return allRows;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - activePeriod);
+  return allRows.filter(r => {
+    const d = parseDate(r['Date'] || r[Object.keys(r)[0]]);
+    return d && d >= cutoff;
+  });
+}
+
+function sum(rows, col) { return rows.reduce((a, r) => a + toNum(r[col]), 0); }
+function fmt(n, dec=1) { return isNaN(n) ? '—' : n.toFixed(dec); }
+function fmtPct(n) { return isNaN(n)||!isFinite(n) ? '—' : fmt(n) + '%'; }
+function fmtDollar(n) { if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'k'; return '$' + Math.round(n); }
+
+function pctColor(v, good, warn) {
+  if (v >= good) return 'var(--green2)';
+  if (v >= warn) return 'var(--amber2)';
+  return 'var(--red2)';
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderPage() {
+  const rows = getRows();
+  const content = document.getElementById('content');
+
+  // Build pages
+  const pages = ['overview','funnel','insights','trends','revenue','traffic','booking'];
+  let html = '';
+  pages.forEach(p => {
+    html += `<div id="page-${p}" class="page${p===activePage?' active':''}"></div>`;
+  });
+  content.innerHTML = html;
+
+  if (activePage === 'overview') renderOverview(rows);
+  else if (activePage === 'funnel') renderFunnel(rows);
+  else if (activePage === 'insights') renderInsights(rows);
+  else if (activePage === 'trends') renderTrends(rows);
+  else if (activePage === 'revenue') renderRevenue(rows);
+  else if (activePage === 'traffic') renderTraffic(rows);
+  else if (activePage === 'booking') renderBooking(rows);
+}
+
+function renderOverview(rows) {
+  const el = document.getElementById('page-overview');
+
+  const shows = sum(rows, 'Shows');
+  const booked = sum(rows, 'Calls Booked');
+  const noShows = sum(rows, 'No-shows');
+  const cancels = sum(rows, 'Cancellations');
+  const reschedules = sum(rows, 'Reschedules');
+  const pitched = sum(rows, 'Pitched');
+  const closed = sum(rows, 'Closed');
+  const dqs = sum(rows, 'DQs');
+  const cc = sum(rows, 'Cash Collected');
+  const cv = sum(rows, 'Contract Value');
+  const aov = closed > 0 ? cv / closed : 0;
+  const copcTaken = sum(rows, 'COPC (Taken)');
+  const tfSubmits = sum(rows, 'TF Submits');
+
+  const showRate = booked > 0 ? (shows / booked) * 100 : 0;
+  const closeRate = pitched > 0 ? (closed / pitched) * 100 : 0;
+  const pitchRate = shows > 0 ? (pitched / shows) * 100 : 0;
+  const cancelRate = booked > 0 ? (cancels / booked) * 100 : 0;
+  const noShowRate = booked > 0 ? (noShows / booked) * 100 : 0;
+  const dqRate = shows > 0 ? (dqs / shows) * 100 : 0;
+  const bookRate = tfSubmits > 0 ? (booked / tfSubmits) * 100 : 0;
+
+  el.innerHTML = `
+    <div class="mgrid">
+      <div class="mt acc"><div class="lbl">Cash Collected</div><div class="val">${fmtDollar(cc)}</div><div class="dlt">Contract value: ${fmtDollar(cv)}</div></div>
+      <div class="mt grn"><div class="lbl">Closes</div><div class="val">${closed}</div><div class="dlt">From ${pitched} pitched</div></div>
+      <div class="mt"><div class="lbl">AOV</div><div class="val">${fmtDollar(aov)}</div><div class="dlt">Avg order value</div></div>
+      <div class="mt pur"><div class="lbl">COPC (Taken)</div><div class="val">${fmtDollar(copcTaken)}</div><div class="dlt">Cost per call taken</div></div>
+      <div class="mt"><div class="lbl">Calls Booked</div><div class="val">${booked}</div><div class="dlt">From ${tfSubmits} TF submits</div></div>
+      <div class="mt"><div class="lbl">Shows</div><div class="val">${shows}</div><div class="dlt">Attended calls</div></div>
+      <div class="mt ${showRate >= 60 ? 'grn' : showRate >= 45 ? 'amb' : 'red'}">
+        <div class="lbl">Show Rate</div>
+        <div class="val" style="color:${pctColor(showRate,60,45)}">${fmtPct(showRate)}</div>
+        <div class="dlt">${noShows} no-shows · ${cancels} cancels</div>
+      </div>
+      <div class="mt ${closeRate >= 40 ? 'grn' : closeRate >= 30 ? 'amb' : 'red'}">
+        <div class="lbl">Close Rate</div>
+        <div class="val" style="color:${pctColor(closeRate,40,30)}">${fmtPct(closeRate)}</div>
+        <div class="dlt">Pitched → closed</div>
+      </div>
+      <div class="mt"><div class="lbl">Pitch Rate</div><div class="val">${fmtPct(pitchRate)}</div><div class="dlt">Showed → pitched</div></div>
+      <div class="mt amb"><div class="lbl">Cancel Rate</div><div class="val" style="color:var(--amber2)">${fmtPct(cancelRate)}</div><div class="dlt">${cancels} cancellations</div></div>
+      <div class="mt red"><div class="lbl">No Show Rate</div><div class="val" style="color:var(--red2)">${fmtPct(noShowRate)}</div><div class="dlt">${noShows} no shows</div></div>
+      <div class="mt"><div class="lbl">DQ Rate</div><div class="val">${fmtPct(dqRate)}</div><div class="dlt">${dqs} disqualified</div></div>
+    </div>
+
+    <div class="grid2 mb14">
+      <div class="card">
+        <div class="ctitle"><i class="ti ti-chart-line" aria-hidden="true"></i> Show Rate & Close Rate — Daily</div>
+        <div class="cw" style="height:190px"><canvas id="c-overview-main" role="img" aria-label="Daily show rate and close rate trend">Daily trend.</canvas></div>
+      </div>
+      <div class="card">
+        <div class="ctitle"><i class="ti ti-chart-donut" aria-hidden="true"></i> Call Outcomes</div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div class="cw" style="height:160px;width:160px;flex-shrink:0"><canvas id="c-overview-donut" role="img" aria-label="Call outcome donut">Outcomes.</canvas></div>
+          <div style="flex:1;font-size:12px;">
+            ${[
+              ['Closed', closed, 'var(--green2)'],
+              ['No Close', pitched - closed, 'var(--muted)'],
+              ['DQ', dqs, 'var(--amber2)'],
+              ['No Show', noShows, 'var(--red2)'],
+              ['Cancelled', cancels, 'var(--red2)'],
+              ['Rescheduled', reschedules, 'var(--accent2)'],
+            ].map(([l,v,c]) => `
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-family:var(--mono)">
+                <span style="color:var(--muted2)">${l}</span>
+                <span style="color:${c};font-weight:600">${v}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle"><i class="ti ti-currency-dollar" aria-hidden="true"></i> Cash Collected — Daily</div>
+      <div class="cw" style="height:160px"><canvas id="c-overview-cc" role="img" aria-label="Daily cash collected">CC.</canvas></div>
+    </div>
+  `;
+
+  // Charts
+  const dated = rows.filter(r => parseDate(r['Date'])).sort((a,b) => parseDate(a['Date']) - parseDate(b['Date']));
+  const labels = dated.map(r => {
+    const d = parseDate(r['Date']);
+    return d.toLocaleDateString('en-GB',{month:'short',day:'numeric'});
+  });
+
+  Chart.defaults.color = '#6b7280';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+  Chart.defaults.font.family = "'DM Mono', monospace";
+  Chart.defaults.font.size = 11;
+
+  destroyChart('c-overview-main');
+  charts['c-overview-main'] = new Chart(document.getElementById('c-overview-main'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Show Rate %', data: dated.map(r => toNum(r['Show Rate %'])), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: '#3b82f6' },
+        { label: 'Close Rate %', data: dated.map(r => toNum(r['Close Rate %'])), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.06)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: '#22c55e', borderDash: [4,3] },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+  });
+
+  destroyChart('c-overview-donut');
+  charts['c-overview-donut'] = new Chart(document.getElementById('c-overview-donut'), {
+    type: 'doughnut',
+    data: { labels: ['Closed','No Close','DQ'], datasets: [{ data: [closed, Math.max(0,pitched-closed), dqs], backgroundColor: ['#22c55e','#374151','#f59e0b'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false } } }
+  });
+
+  destroyChart('c-overview-cc');
+  charts['c-overview-cc'] = new Chart(document.getElementById('c-overview-cc'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'CC', data: dated.map(r => toNum(r['Cash Collected'])), backgroundColor: 'rgba(59,130,246,0.6)', borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } } } }
+  });
+}
+
+function renderFunnel(rows) {
+  const el = document.getElementById('page-funnel');
+  const tfSubmits = sum(rows, 'TF Submits');
+  const booked = sum(rows, 'Calls Booked');
+  const shows = sum(rows, 'Shows');
+  const pitched = sum(rows, 'Pitched');
+  const closed = sum(rows, 'Closed');
+  const cc = sum(rows, 'Cash Collected');
+  const cv = sum(rows, 'Contract Value');
+
+  const stages = [
+    { label: 'TF Submits', val: tfSubmits, color: '#3b82f6', cvr: null },
+    { label: 'Booked', val: booked, color: '#60a5fa', cvr: tfSubmits > 0 ? booked/tfSubmits*100 : 0, fromLabel: 'of submits' },
+    { label: 'Showed', val: shows, color: '#f59e0b', cvr: booked > 0 ? shows/booked*100 : 0, fromLabel: 'of booked' },
+    { label: 'Pitched', val: pitched, color: '#a855f7', cvr: shows > 0 ? pitched/shows*100 : 0, fromLabel: 'of showed' },
+    { label: 'Closed', val: closed, color: '#22c55e', cvr: pitched > 0 ? closed/pitched*100 : 0, fromLabel: 'of pitched' },
+    { label: 'CC', val: '$' + Math.round(cc/1000) + 'k', color: '#4ade80', cvr: cv > 0 ? cc/cv*100 : 0, fromLabel: 'of contract val' },
+  ];
+
+  const maxVal = Math.max(...stages.slice(0,-1).map(s => s.val || 0), 1);
+  const barMaxH = 130;
+
+  const funnelHTML = stages.map((s, i) => {
+    const h = typeof s.val === 'number' ? Math.max(16, (s.val / maxVal) * barMaxH) : 30;
+    const cvrColor = s.cvr === null ? 'var(--muted)' : s.cvr >= 60 ? 'var(--green2)' : s.cvr >= 40 ? 'var(--amber2)' : 'var(--red2)';
+    return `
+      <div class="fstage">
+        <div style="height:${barMaxH}px;width:100%;display:flex;align-items:flex-end;justify-content:center;">
+          <div class="fbar" style="background:${s.color};height:${h}px;opacity:0.85"></div>
+        </div>
+        <div class="flab">${s.label}</div>
+        <div class="fval">${s.val}</div>
+        ${s.cvr !== null ? `<div class="fcvr" style="color:${cvrColor}">${fmt(s.cvr)}% ${s.fromLabel}</div>` : '<div class="fcvr">baseline</div>'}
+      </div>
+      ${i < stages.length-1 ? '<div class="farr">›</div>' : ''}`;
+  }).join('');
+
+  const convRows = [
+    ['TF Submit → Booked', tfSubmits, booked, booked/Math.max(tfSubmits,1)*100, 70, 50],
+    ['Booked → Showed', booked, shows, shows/Math.max(booked,1)*100, 60, 45],
+    ['Showed → Pitched', shows, pitched, pitched/Math.max(shows,1)*100, 85, 70],
+    ['Pitched → Closed', pitched, closed, closed/Math.max(pitched,1)*100, 40, 28],
+  ].map(([label, from, to, pct, good, warn]) => `
+    <tr>
+      <td class="mono">${label}</td>
+      <td class="mono">${from}</td>
+      <td class="mono">${to}</td>
+      <td style="color:${pctColor(pct,good,warn)};font-weight:700;font-family:var(--mono)">${fmtPct(pct)}</td>
+      <td class="mono" style="color:var(--muted2)">${from - to} lost</td>
+      <td><span class="badge ${pct>=good?'g':pct>=warn?'a':'r'}">${pct>=good?'Healthy':pct>=warn?'Monitor':'Bottleneck'}</span></td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <div class="card mb14">
+      <div class="ctitle"><i class="ti ti-filter" aria-hidden="true"></i> Full Funnel</div>
+      <div class="funnel">${funnelHTML}</div>
+    </div>
+    <div class="card mb14">
+      <div class="ctitle"><i class="ti ti-arrow-right" aria-hidden="true"></i> Stage Conversions</div>
+      <table class="dt"><thead><tr><th>Transition</th><th>From</th><th>To</th><th>Conv%</th><th>Leak</th><th>Status</th></tr></thead>
+      <tbody>${convRows}</tbody></table>
+    </div>
+    <div class="card">
+      <div class="ctitle"><i class="ti ti-info-circle" aria-hidden="true"></i> Revenue Conversion</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${[
+          ['TF Submits', tfSubmits, '#3b82f6'],
+          ['Calls Booked', booked, '#60a5fa'],
+          ['Shows', shows, '#f59e0b'],
+          ['Closed', closed, '#22c55e'],
+          ['Cash Collected', fmtDollar(cc), '#4ade80'],
+        ].map(([l,v,c]) => `
+          <div style="flex:1;min-width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px">
+            <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:4px">${l}</div>
+            <div style="font-size:20px;font-weight:700;color:${c}">${v}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderInsights(rows) {
+  const el = document.getElementById('page-insights');
+
+  const booked = sum(rows, 'Calls Booked');
+  const shows = sum(rows, 'Shows');
+  const noShows = sum(rows, 'No-shows');
+  const cancels = sum(rows, 'Cancellations');
+  const pitched = sum(rows, 'Pitched');
+  const closed = sum(rows, 'Closed');
+  const cc = sum(rows, 'Cash Collected');
+  const cv = sum(rows, 'Contract Value');
+  const dqs = sum(rows, 'DQs');
+  const tfSubmits = sum(rows, 'TF Submits');
+  const tfStarts = sum(rows, 'TF Starts');
+  const vslPlays = sum(rows, 'VSL Plays');
+
+  const showRate = booked > 0 ? shows/booked*100 : 0;
+  const closeRate = pitched > 0 ? closed/pitched*100 : 0;
+  const bookRate = tfSubmits > 0 ? booked/tfSubmits*100 : 0;
+  const tfCompRate = tfStarts > 0 ? tfSubmits/tfStarts*100 : 0;
+  const vslToTF = vslPlays > 0 ? tfStarts/vslPlays*100 : 0;
+  const cancelRate = booked > 0 ? cancels/booked*100 : 0;
+  const noShowRate = booked > 0 ? noShows/booked*100 : 0;
+  const dqRate = shows > 0 ? dqs/shows*100 : 0;
+  const ccVsCV = cv > 0 ? cc/cv*100 : 0;
+
+  // Dynamic insight generation
+  const insights = [];
+
+  if (showRate < 50) insights.push({ type:'d', icon:'ti-flame', title: `Show rate is ${fmtPct(showRate)} — critical bottleneck`, body: `Only ${shows} of ${booked} booked calls showed. Target is 60%+. This is your primary revenue leak right now — every 10pp improvement adds ~${fmtDollar(closed/Math.max(shows,1) * booked * 0.1 * (sum(rows,'Contract Value')/Math.max(closed,1)))} in contract value per period.` });
+  else if (showRate < 65) insights.push({ type:'w', icon:'ti-calendar-x', title: `Show rate ${fmtPct(showRate)} — needs improvement`, body: `${shows} of ${booked} booked showed. Getting to 65%+ would add approximately ${Math.round((0.65 - showRate/100) * booked)} additional attended calls this period.` });
+  else insights.push({ type:'o', icon:'ti-check', title: `Show rate ${fmtPct(showRate)} — on target`, body: `${shows} of ${booked} booked calls attended. Focus on maintaining confirmation quality.` });
+
+  if (cancelRate > 20) insights.push({ type:'d', icon:'ti-ban', title: `Cancellation rate ${fmtPct(cancelRate)} — above threshold`, body: `${cancels} cancellations from ${booked} bookings. Target is under 15%. Cancellations at this level suggest leads are not being confirmed with enough urgency or re-committed after booking.` });
+
+  if (noShowRate > 25) insights.push({ type:'w', icon:'ti-user-x', title: `No-show rate ${fmtPct(noShowRate)}`, body: `${noShows} no-shows in this period. Most no-shows are uncontacted or unconfirmed leads. A same-day reminder sequence and setter confirmation protocol would directly address this.` });
+
+  if (closeRate >= 40) insights.push({ type:'o', icon:'ti-trending-up', title: `Close rate ${fmtPct(closeRate)} — healthy`, body: `${closed} closes from ${pitched} pitched. Closing is NOT the bottleneck. Effort should stay focused on attendance and show rate, not closing technique.` });
+  else if (closeRate < 30) insights.push({ type:'w', icon:'ti-trending-down', title: `Close rate ${fmtPct(closeRate)} — below target`, body: `${closed} closes from ${pitched} pitched. Target is 35%+. Review objection handling — are calls ending too early? Are DQs being correctly identified before pitch?` });
+
+  if (bookRate > 0 && bookRate < 50) insights.push({ type:'w', icon:'ti-calendar-plus', title: `Book rate ${fmtPct(bookRate)} — room to improve`, body: `Only ${booked} of ${tfSubmits} TF submits converted to booked calls. Target is 60%+. Review the post-TF confirmation page and speed-to-booking flow.` });
+
+  if (dqRate > 10) insights.push({ type:'w', icon:'ti-filter-x', title: `DQ rate ${fmtPct(dqRate)} — leads qualifying poorly`, body: `${dqs} of ${shows} attended calls were DQ'd on the call. Consider tightening the typeform qualification questions to filter lower-quality leads before they book.` });
+
+  if (ccVsCV < 80 && cv > 0) insights.push({ type:'w', icon:'ti-credit-card', title: `Only ${fmtPct(ccVsCV)} of contract value collected`, body: `${fmtDollar(cc)} collected vs ${fmtDollar(cv)} contracted. The gap of ${fmtDollar(cv-cc)} represents either payment plans, pending collections, or failed charges. Follow up within 24h of close.` });
+
+  if (vslToTF > 0 && vslToTF < 8) insights.push({ type:'i', icon:'ti-video', title: `VSL → TF start rate ${fmtPct(vslToTF)}`, body: `${tfStarts} typeform starts from ${vslPlays} VSL plays. A rate above 10% is healthy for warm organic traffic. Review VSL hook and call-to-action placement.` });
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="ctitle"><i class="ti ti-bulb" aria-hidden="true"></i> Auto-Detected Insights — ${periodLabel()}</div>
+      ${insights.length === 0 ? '<div style="color:var(--muted2);font-size:13px;padding:20px 0;text-align:center">No data available for selected period.</div>' :
+        insights.map(ins => `
+          <div class="insight">
+            <div class="iico ${ins.type}"><i class="ti ${ins.icon}" aria-hidden="true"></i></div>
+            <div class="itxt"><div class="tt">${ins.title}</div><div class="bd">${ins.body}</div></div>
+          </div>`).join('')}
+    </div>`;
+}
+
+function renderTrends(rows) {
+  const el = document.getElementById('page-trends');
+  const dated = rows.filter(r => parseDate(r['Date'])).sort((a,b) => parseDate(a['Date']) - parseDate(b['Date']));
+  const labels = dated.map(r => parseDate(r['Date']).toLocaleDateString('en-GB',{month:'short',day:'numeric'}));
+
+  el.innerHTML = `
+    <div class="card mb14">
+      <div class="ctitle"><i class="ti ti-chart-line" aria-hidden="true"></i> Show Rate & Close Rate</div>
+      <div class="cw" style="height:200px"><canvas id="c-trends-main" role="img" aria-label="Show and close rate trend">Trend.</canvas></div>
+    </div>
+    <div class="grid2 mb14">
+      <div class="card">
+        <div class="ctitle">Daily Volume</div>
+        <div class="cw" style="height:180px"><canvas id="c-trends-vol" role="img" aria-label="Daily volume">Volume.</canvas></div>
+      </div>
+      <div class="card">
+        <div class="ctitle">No Shows & Cancellations</div>
+        <div class="cw" style="height:180px"><canvas id="c-trends-loss" role="img" aria-label="No shows and cancellations">Loss.</canvas></div>
+      </div>
+    </div>`;
+
+  destroyChart('c-trends-main');
+  charts['c-trends-main'] = new Chart(document.getElementById('c-trends-main'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Show Rate %', data: dated.map(r => toNum(r['Show Rate %'])), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: '#3b82f6' },
+      { label: 'Close Rate %', data: dated.map(r => toNum(r['Close Rate %'])), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.06)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: '#22c55e', borderDash: [5,3] },
+      { label: 'Pitch Rate %', data: dated.map(r => toNum(r['Pitch Rate %'])), borderColor: '#a855f7', borderWidth: 1.5, tension: 0.4, pointRadius: 2, pointBackgroundColor: '#a855f7', borderDash: [2,2] },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+  });
+
+  destroyChart('c-trends-vol');
+  charts['c-trends-vol'] = new Chart(document.getElementById('c-trends-vol'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Booked', data: dated.map(r => toNum(r['Calls Booked'])), backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3 },
+      { label: 'Shows', data: dated.map(r => toNum(r['Shows'])), backgroundColor: 'rgba(34,197,94,0.7)', borderRadius: 3 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true } } }
+  });
+
+  destroyChart('c-trends-loss');
+  charts['c-trends-loss'] = new Chart(document.getElementById('c-trends-loss'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'No Shows', data: dated.map(r => toNum(r['No-shows'])), backgroundColor: 'rgba(239,68,68,0.7)', borderRadius: 3 },
+      { label: 'Cancellations', data: dated.map(r => toNum(r['Cancellations'])), backgroundColor: 'rgba(245,158,11,0.65)', borderRadius: 3 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true } } }
+  });
+}
+
+function renderRevenue(rows) {
+  const el = document.getElementById('page-revenue');
+  const dated = rows.filter(r => parseDate(r['Date'])).sort((a,b) => parseDate(a['Date']) - parseDate(b['Date']));
+  const labels = dated.map(r => parseDate(r['Date']).toLocaleDateString('en-GB',{month:'short',day:'numeric'}));
+
+  const cc = sum(rows, 'Cash Collected');
+  const cv = sum(rows, 'Contract Value');
+  const closed = sum(rows, 'Closed');
+  const shows = sum(rows, 'Shows');
+  const booked = sum(rows, 'Calls Booked');
+  const copcT = sum(rows, 'COPC (Taken)');
+  const copcB = sum(rows, 'COPC (Booked)');
+  const aov = closed > 0 ? cv/closed : 0;
+
+  el.innerHTML = `
+    <div class="mgrid mb14" style="grid-template-columns:repeat(4,1fr)">
+      <div class="mt acc"><div class="lbl">Cash Collected</div><div class="val">${fmtDollar(cc)}</div></div>
+      <div class="mt"><div class="lbl">Contract Value</div><div class="val">${fmtDollar(cv)}</div></div>
+      <div class="mt"><div class="lbl">AOV</div><div class="val">${fmtDollar(aov)}</div></div>
+      <div class="mt pur"><div class="lbl">COPC (Taken)</div><div class="val">${fmtDollar(copcT)}</div><div class="dlt">Booked: ${fmtDollar(copcB)}</div></div>
+    </div>
+    <div class="card mb14">
+      <div class="ctitle"><i class="ti ti-currency-dollar" aria-hidden="true"></i> Cash Collected vs Contract Value — Daily</div>
+      <div class="cw" style="height:200px"><canvas id="c-rev-main" role="img" aria-label="CC vs CV">Revenue.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle"><i class="ti ti-table" aria-hidden="true"></i> Daily Revenue Detail</div>
+      <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+        <table class="dt">
+          <thead><tr><th>Date</th><th>Closed</th><th>Cash Coll.</th><th>Contract Val</th><th>AOV</th><th>COPC Taken</th></tr></thead>
+          <tbody>
+            ${dated.filter(r => toNum(r['Cash Collected']) > 0 || toNum(r['Closed']) > 0).map(r => `
+              <tr>
+                <td>${parseDate(r['Date']).toLocaleDateString('en-GB',{weekday:'short',month:'short',day:'numeric'})}</td>
+                <td>${toNum(r['Closed'])}</td>
+                <td style="color:var(--green2)">${fmtDollar(toNum(r['Cash Collected']))}</td>
+                <td>${fmtDollar(toNum(r['Contract Value']))}</td>
+                <td>${fmtDollar(toNum(r['AOV']))}</td>
+                <td>${fmtDollar(toNum(r['COPC (Taken)']))}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  destroyChart('c-rev-main');
+  charts['c-rev-main'] = new Chart(document.getElementById('c-rev-main'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Cash Collected', data: dated.map(r => toNum(r['Cash Collected'])), backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3 },
+      { label: 'Contract Value', data: dated.map(r => toNum(r['Contract Value'])), backgroundColor: 'rgba(34,197,94,0.4)', borderRadius: 3 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } } } }
+  });
+}
+
+function renderTraffic(rows) {
+  const el = document.getElementById('page-traffic');
+  const dated = rows.filter(r => parseDate(r['Date'])).sort((a,b) => parseDate(a['Date']) - parseDate(b['Date']));
+  const labels = dated.map(r => parseDate(r['Date']).toLocaleDateString('en-GB',{month:'short',day:'numeric'}));
+
+  const lpVisits = sum(rows, 'LP Visits');
+  const vslPlays = sum(rows, 'VSL Plays');
+  const tfStarts = sum(rows, 'TF Starts');
+  const tfSubmits = sum(rows, 'TF Submits');
+  const vslToTF = vslPlays > 0 ? tfStarts/vslPlays*100 : 0;
+  const tfComp = tfStarts > 0 ? tfSubmits/tfStarts*100 : 0;
+  const lpToVSL = lpVisits > 0 ? vslPlays/lpVisits*100 : 0;
+  const avgWatch = rows.filter(r => toNum(r['VSL Avg Watch %']) > 0).reduce((a,r,_,arr) => a + toNum(r['VSL Avg Watch %'])/arr.length, 0);
+
+  el.innerHTML = `
+    <div class="mgrid mb14" style="grid-template-columns:repeat(4,1fr)">
+      <div class="mt"><div class="lbl">LP Visits</div><div class="val">${lpVisits}</div><div class="dlt">LP→VSL: ${fmtPct(lpToVSL)}</div></div>
+      <div class="mt"><div class="lbl">VSL Plays</div><div class="val">${vslPlays}</div><div class="dlt">Avg watch: ${fmtPct(avgWatch)}</div></div>
+      <div class="mt amb"><div class="lbl">TF Starts</div><div class="val">${tfStarts}</div><div class="dlt">VSL→TF: ${fmtPct(vslToTF)}</div></div>
+      <div class="mt grn"><div class="lbl">TF Submits</div><div class="val">${tfSubmits}</div><div class="dlt">Completion: ${fmtPct(tfComp)}</div></div>
+    </div>
+    <div class="card mb14">
+      <div class="ctitle"><i class="ti ti-funnel" aria-hidden="true"></i> Traffic Funnel — Daily</div>
+      <div class="cw" style="height:200px"><canvas id="c-traf-main" role="img" aria-label="Traffic funnel">Traffic.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle"><i class="ti ti-video" aria-hidden="true"></i> VSL Avg Watch % — Daily</div>
+      <div class="cw" style="height:160px"><canvas id="c-traf-watch" role="img" aria-label="VSL watch rate">Watch.</canvas></div>
+    </div>`;
+
+  destroyChart('c-traf-main');
+  charts['c-traf-main'] = new Chart(document.getElementById('c-traf-main'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'LP Visits', data: dated.map(r => toNum(r['LP Visits'])), borderColor: '#6b7280', borderWidth: 1.5, tension: 0.4, pointRadius: 2, borderDash: [3,3] },
+      { label: 'VSL Plays', data: dated.map(r => toNum(r['VSL Plays'])), borderColor: '#3b82f6', borderWidth: 2, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#3b82f6' },
+      { label: 'TF Starts', data: dated.map(r => toNum(r['TF Starts'])), borderColor: '#f59e0b', borderWidth: 2, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', borderDash: [4,3] },
+      { label: 'TF Submits', data: dated.map(r => toNum(r['TF Submits'])), borderColor: '#22c55e', borderWidth: 2, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#22c55e' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true } } }
+  });
+
+  destroyChart('c-traf-watch');
+  charts['c-traf-watch'] = new Chart(document.getElementById('c-traf-watch'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Avg Watch %', data: dated.map(r => toNum(r['VSL Avg Watch %'])), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.08)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: '#a855f7' }]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+  });
+}
+
+function renderBooking(rows) {
+  const el = document.getElementById('page-booking');
+  const dated = rows.filter(r => parseDate(r['Date'])).sort((a,b) => parseDate(a['Date']) - parseDate(b['Date']));
+  const labels = dated.map(r => parseDate(r['Date']).toLocaleDateString('en-GB',{month:'short',day:'numeric'}));
+
+  const booked = sum(rows, 'Calls Booked');
+  const tfSubmits = sum(rows, 'TF Submits');
+  const bookRate = tfSubmits > 0 ? booked/tfSubmits*100 : 0;
+  const speedVals = rows.map(r => toNum(r['Speed to Lead (min)'])).filter(v => v > 0);
+  const avgSpeed = speedVals.length > 0 ? speedVals.reduce((a,b) => a+b, 0) / speedVals.length : 0;
+  const overallCVR = sum(rows, 'Overall CVR %') / Math.max(rows.filter(r => toNum(r['Overall CVR %']) > 0).length, 1);
+
+  el.innerHTML = `
+    <div class="mgrid mb14" style="grid-template-columns:repeat(4,1fr)">
+      <div class="mt acc"><div class="lbl">Calls Booked</div><div class="val">${booked}</div></div>
+      <div class="mt ${bookRate>=60?'grn':bookRate>=45?'amb':'red'}"><div class="lbl">Book Rate</div><div class="val" style="color:${pctColor(bookRate,60,45)}">${fmtPct(bookRate)}</div><div class="dlt">TF submit → booked</div></div>
+      <div class="mt ${avgSpeed<=15?'grn':avgSpeed<=30?'amb':'red'}"><div class="lbl">Avg Speed to Lead</div><div class="val" style="color:${avgSpeed<=15?'var(--green2)':avgSpeed<=30?'var(--amber2)':'var(--red2)'}">${fmt(avgSpeed, 0)} min</div><div class="dlt">Target: &lt;10 min</div></div>
+      <div class="mt"><div class="lbl">Overall CVR</div><div class="val">${fmtPct(overallCVR)}</div><div class="dlt">Lead → cash</div></div>
+    </div>
+    <div class="card mb14">
+      <div class="ctitle"><i class="ti ti-calendar-plus" aria-hidden="true"></i> Bookings & Book Rate — Daily</div>
+      <div class="cw" style="height:200px"><canvas id="c-book-main" role="img" aria-label="Daily bookings and book rate">Bookings.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="ctitle"><i class="ti ti-clock" aria-hidden="true"></i> Speed to Lead — Daily (min)</div>
+      <div class="cw" style="height:160px"><canvas id="c-book-speed" role="img" aria-label="Speed to lead">Speed.</canvas></div>
+    </div>`;
+
+  destroyChart('c-book-main');
+  charts['c-book-main'] = new Chart(document.getElementById('c-book-main'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Calls Booked', data: dated.map(r => toNum(r['Calls Booked'])), backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 3, yAxisID: 'y' },
+      { label: 'Book Rate %', data: dated.map(r => toNum(r['Book Rate %'])), borderColor: '#f59e0b', borderWidth: 2, type: 'line', tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', yAxisID: 'y2' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true, position: 'left' }, y2: { grid: { display: false }, min: 0, max: 100, position: 'right', ticks: { callback: v => v + '%' } } } }
+  });
+
+  destroyChart('c-book-speed');
+  charts['c-book-speed'] = new Chart(document.getElementById('c-book-speed'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Speed to Lead (min)', data: dated.map(r => toNum(r['Speed to Lead (min)'])), borderColor: '#14b8a6', backgroundColor: 'rgba(20,184,166,0.08)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: '#14b8a6' }]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true, ticks: { callback: v => v + 'm' } } } }
+  });
+}
+
+// Boot
+loadData();
+</script>
+</body>
+</html>
